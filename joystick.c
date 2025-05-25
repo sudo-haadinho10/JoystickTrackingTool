@@ -52,7 +52,7 @@ static pthread_mutex_t joystick_mutex = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t cond = PTHREAD_COND_INITIALIZER;
 
 static char *itimerspec_dump(struct itimerspec *ts);
-static uint64_t m_interval = 100;
+static uint64_t m_interval = 10;
 
 int Init_Uart(speed_t baud){
         int serial_port=open("/dev/serial0",O_RDWR);
@@ -236,7 +236,7 @@ void *send_thread(void *arg) {
         }
 	while(1){
 
-	ret = epoll_wait(epoll_fd,&ev,1,100); //10ms
+	ret = epoll_wait(epoll_fd,&ev,1,10); //10ms
 	//printf("%d\n",ret);
 
 	if(ret < 0 ) {
@@ -259,21 +259,22 @@ void *send_thread(void *arg) {
 
         //unsigned char msg[] ={'A'};
 		pthread_mutex_lock(&joystick_mutex);
-		for(int i=0;i<num_joysticks;i++) {
-			for(int j=0;j<joysticks[i].number_of_axes;j++){
-				snprintf(buffer,sizeof(buffer),"%s Axis %d value %d\r\n",joysticks[i].name,j,joysticks[i].axes[j]);
-                        	//snprintf(buffer,sizeof(buffer),"Axis %d value %d\r\n",j,joysticks[0].axes[j]);
+		//for(int i=0;i<num_joysticks;i++) {
+			//joysticks[i].number_of_axes
+		for(int j=0;j<3;j++){
+			snprintf(buffer,sizeof(buffer),"%s Axis %d value %d\r\n","JS0",j,joysticks[0].axes[j]);
+                        //snprintf(buffer,sizeof(buffer),"Axis %d value %d\r\n",j,joysticks[0].axes[j]);
 
-        			write(serial_fd1,buffer,strlen(buffer));
-				send_joystick_data(buffer);
-			}
-			for(int j=0;j<3;j++){
-				snprintf(buffer,sizeof(buffer),"%s Buttons %d value %d\r\n",joysticks[i].name,j,joysticks[i].buttons[j]);
-                        	//snprintf(buffer,sizeof(buffer),"Buttons %d value %d\r\n",j,joysticks[0].buttons[j]);
-				write(serial_fd1,buffer,strlen(buffer));
-				send_joystick_data(buffer);
-			}
+  		      	write(serial_fd1,buffer,strlen(buffer));
+			send_joystick_data(buffer);
 		}
+		for(int j=0;j<2;j++){
+			snprintf(buffer,sizeof(buffer),"%s Buttons %d value %d\r\n","JS1",j,joysticks[0].buttons[j]);
+                        //snprintf(buffer,sizeof(buffer),"Buttons %d value %d\r\n",j,joysticks[0].buttons[j]);
+			write(serial_fd1,buffer,strlen(buffer));
+			send_joystick_data(buffer);
+		}
+		//}
 		pthread_mutex_unlock(&joystick_mutex);
 
 	}
