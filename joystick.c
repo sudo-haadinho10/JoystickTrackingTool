@@ -17,12 +17,13 @@
 #include <signal.h>
 #include <inttypes.h>
 #include "wsServer.h"
+#include "ring_buffer.h"
 
 
 #define MAX_JOYSTICKS 2
 #define MAX_EVENTS 2
 
-volatile sig_atomic_t stop_flag=0;
+//volatile sig_atomic_t stop_flag=0;
 
 //Function Prototypes
 void *event_thread(void *arg);
@@ -95,16 +96,25 @@ int Init_Uart(speed_t baud){
 		return -1;
 	}
 	//return 0; //Success
+	printf("UART SERIAL_FD %d\n",serial_port);
 	return serial_port;
 }
 void *event_thread(void *arg){
          printf("hello from T1\n");
          struct js_event e;
+	 JoystickEvent je;
          while(1){
-                for(int i=0;i<num_joysticks;i++){
-	            while (read(joystick_fds[i], &e, sizeof(e)) > 0) {
+                //for(int i=0;i<num_joysticks;i++){
+	            while (read(joystick_fds[0], &e, sizeof(e)) > 0) {
                                 if(e.type & JS_EVENT_INIT) continue;
-				pthread_mutex_lock(&joystick_mutex);
+				//Addition  1
+				je.joystick_idx=0;
+				je.type=e.type&~JS_EVENT_INIT;
+				je.number=e.number;
+				je.value=e.value;
+				//end of addition 1
+
+				/*pthread_mutex_lock(&joystick_mutex);
                                 switch(e.type & ~JS_EVENT_INIT){
                                     case JS_EVENT_AXIS:
                                         if(e.number <8){
@@ -118,11 +128,23 @@ void *event_thread(void *arg){
 					    printf("%s BUTTON %d value:%d\n",joysticks[i].name,e.number,e.value);
                                         }
 					break;
-                                }
-                                pthread_mutex_unlock(&joystick_mutex);
+                                }*/
+				// Addition 2
+				pthread_mutex_lock(&event_buffer.mutex);
+				if(event_buffer.count<BUFFER_SIZE){
+					event_buffer.events[event_buffer.head]=je;
+					event_buffer.head = (event_buffer.head + 1) % BUFFER_SIZE;
+					event_buffer.count++;
+					printf("%s %s %d value:%d\n",joysticks[0].name,je.type==JS_EVENT_AXIS?"AXIS":"BUTTON",je.number,je.value);
+				}
+				else{
+					printf("Warning Buffer overrun,event dropped\n");
+				}
+
+                                pthread_mutex_unlock(&event_buffer.mutex);
 
                     }
-                }
+                //}
                 usleep(1000);
          }
 	return NULL;
@@ -234,9 +256,11 @@ void *send_thread(void *arg) {
                 close(timer_fd);
                 exit(EXIT_FAILURE);
         }
+	printf("set timerfd time=%s\n",itimerspec_dump(&new_value));
+
 	while(1){
 
-	ret = epoll_wait(epoll_fd,&ev,1,10); //10ms
+	ret = epoll_wait(epoll_fd,&ev,1,13); //10ms
 	//printf("%d\n",ret);
 
 	if(ret < 0 ) {
@@ -258,7 +282,7 @@ void *send_thread(void *arg) {
 	if(res==1){
 
         //unsigned char msg[] ={'A'};
-		pthread_mutex_lock(&joystick_mutex);
+		/*pthread_mutex_lock(&joystick_mutex);
 		//for(int i=0;i<num_joysticks;i++) {
 			//joysticks[i].number_of_axes
 		for(int j=0;j<3;j++){
@@ -269,15 +293,37 @@ void *send_thread(void *arg) {
 			send_joystick_data(buffer);
 		}
 		for(int j=0;j<2;j++){
-			snprintf(buffer,sizeof(buffer),"%s Buttons %d value %d\r\n","JS1",j,joysticks[0].buttons[j]);
+			snprintf(buffer,sizeof(buffer),"%s Buttons %d value %d\r\n","JS0",j,joysticks[0].buttons[j]);
                         //snprintf(buffer,sizeof(buffer),"Buttons %d value %d\r\n",j,joysticks[0].buttons[j]);
 			write(serial_fd1,buffer,strlen(buffer));
 			send_joystick_data(buffer);
 		}
 		//}
-		pthread_mutex_unlock(&joystick_mutex);
+		pthread_mutex_unlock(&joystick_mutex);*/
+
+		pthread_mutex_lock(&event_buffer.mutex);
+		while(event_buffer.count>0) { 
+			JoystickEvent je=event_buffer.events[event_buffer.tail];
+			event_buffer.tail = (event_buffer.tail+1)%BUFFER_SIZE;
+			event_buffer.count--;
+			const char *type = je.type==JS_EVENT_AXIS?"Axis":"Buttons";
+
+			snprintf(buffer,sizeof(buffer),"%s %s %d value %d\r\n","JS0",type,je.number,je.value);
+			write(serial_fd1,buffer,strlen(buffer));
+			send_joystick_data(buffer);
+		}
 
 	}
+	else{
+		printf("RESETTING TIMER DUE TO ERRORS\n");
+		 if(timerfd_settime(timer_fd,0,&new_value,NULL)<0) {
+                printf("timerfd_settime() failed: errno=%d\n",errno);
+                close(timer_fd);
+                exit(EXIT_FAILURE);
+        	}
+        printf("set timerfd time=%s\n",itimerspec_dump(&new_value));
+	}
+	pthread_mutex_unlock(&event_buffer.mutex);
 			//close(serial_fd1);
     			//serial_fd1=Init_Uart(B115200);
 
