@@ -114,21 +114,7 @@ void *event_thread(void *arg){
 				je.value=e.value;
 				//end of addition 1
 
-				/*pthread_mutex_lock(&joystick_mutex);
-                                switch(e.type & ~JS_EVENT_INIT){
-                                    case JS_EVENT_AXIS:
-                                        if(e.number <8){
-                                            joysticks[i].axes[e.number]=e.value;
-                                            printf("%s AXIS %d value: %d\n",joysticks[i].name,e.number,e.value);
-                                        }
-                                        break;
-                                    case JS_EVENT_BUTTON:
-					if(e.number <32){
-					    joysticks[i].buttons[e.number]=e.value;
-					    printf("%s BUTTON %d value:%d\n",joysticks[i].name,e.number,e.value);
-                                        }
-					break;
-                                }*/
+
 				// Addition 2
 				pthread_mutex_lock(&event_buffer.mutex);
 				if(event_buffer.count<BUFFER_SIZE){
@@ -192,13 +178,6 @@ void *send_thread(void *arg) {
         new_value.it_interval.tv_sec = m_interval / 1000;
         new_value.it_interval.tv_nsec = (m_interval % 1000) * 1000000;
 
-        /*if(timerfd_settime(timer_fd,0,&new_value,NULL)<0) {
-                printf("timerfd_settime() failed: errno=%d\n",errno);
-                close(timer_fd);
-                exit(EXIT_FAILURE);
-        }
-        printf("set timerfd time=%s\n",itimerspec_dump(&new_value));
-	*/
 
 
 	/* Creating an Epoll Instance */
@@ -226,27 +205,7 @@ void *send_thread(void *arg) {
 	}
 	printf("added timerfd to epoll set\n");
 
-
-
-	/*ev.events=EPOLLIN | EPOLLOUT |EPOLLET;
-	events[1].data.fd=serial_fd1;
-
-
-	if(epoll_ctl(epoll_fd,EPOLL_CTL_ADD,serial_fd1,&ev)) {
-		printf("epoll_ctl(ADD) for serial failed:errno=%d\n",errno);
-		close(epoll_fd);
-		close(serial_fd1);
-		exit(EXIT_FAILURE);
-
-	}
-	printf("added serialfd to epoll interested set\n");*/
-
 	sleep(1);
-	/*if(timerfd_settime(timer_fd,0,&new_value,NULL)<0) {
-                printf("timerfd_settime() failed: errno=%d\n",errno);
-                close(timer_fd);
-                exit(EXIT_FAILURE);
-        }*/
 	int ret;
 	memset(&ev,0,sizeof(ev));
 	//unsigned char msg[] ={'A','\r','\n'};
@@ -281,25 +240,6 @@ void *send_thread(void *arg) {
 	printf("read() returned %d, res=%" PRIu64 "\n", ret, res);
 	if(res==1){
 
-        //unsigned char msg[] ={'A'};
-		/*pthread_mutex_lock(&joystick_mutex);
-		//for(int i=0;i<num_joysticks;i++) {
-			//joysticks[i].number_of_axes
-		for(int j=0;j<3;j++){
-			snprintf(buffer,sizeof(buffer),"%s Axis %d value %d\r\n","JS0",j,joysticks[0].axes[j]);
-                        //snprintf(buffer,sizeof(buffer),"Axis %d value %d\r\n",j,joysticks[0].axes[j]);
-
-  		      	write(serial_fd1,buffer,strlen(buffer));
-			send_joystick_data(buffer);
-		}
-		for(int j=0;j<2;j++){
-			snprintf(buffer,sizeof(buffer),"%s Buttons %d value %d\r\n","JS0",j,joysticks[0].buttons[j]);
-                        //snprintf(buffer,sizeof(buffer),"Buttons %d value %d\r\n",j,joysticks[0].buttons[j]);
-			write(serial_fd1,buffer,strlen(buffer));
-			send_joystick_data(buffer);
-		}
-		//}
-		pthread_mutex_unlock(&joystick_mutex);*/
 
 		pthread_mutex_lock(&event_buffer.mutex);
 		while(event_buffer.count>0) { 
@@ -393,7 +333,7 @@ int main(){
         fprintf(stderr,"Error - pthread_create() Thread 2 return code: %d\n",status_2);
         exit(EXIT_FAILURE);
     }
-
+    //uart debugging
     /*else{
 	unsigned char msg[] ={'A','B'};
 	while(1){
