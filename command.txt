@@ -1,0 +1,8 @@
+//Latest
+ gcc -o nikhil_gcs joystick_polling_ulink.c wsServer.c utilities.c create_packet.c ulink/crc.c -I../ext/wsServer/include -Iulink -L../ext/wsServer -Lulink -lws -pthread -Werror
+
+
+
+//LATEST
+gcc -o nikhil_gcs joystick_polling_ulink.c wsServer.c utilities.c create_packet.c ulink/crc.c ulink/dll.c aesgcm.c -I../ext/wsServer/include -Iulink -L../ext/wsServer -Lulink -lws -lssl -lcrypto -pthread -Werror
+
